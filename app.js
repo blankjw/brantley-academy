@@ -23,6 +23,7 @@
   function saveSyncInfo() { try { localStorage.setItem(SYNC_KEY, JSON.stringify({ code: cloud.code, lastSyncedAt: cloud.lastSyncedAt, serverAt: cloud.serverAt, dirty: cloud.dirty, prevCode: cloud.prevCode || null })); } catch (e) { /* ignore */ } }
   function familyLink(code) { return location.origin + location.pathname + '?code=' + encodeURIComponent(code || cloud.code || ''); }
   function rpc(name, args) {
+    if (!SUPA_URL) return Promise.resolve(null); /* hard-off: no URL, no request, ever */
     return fetch(SUPA_URL + '/rest/v1/rpc/' + name, { method: 'POST', headers: { apikey: SUPA_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(args), cache: 'no-store' })
       .then(function (res) { return res.json().catch(function () { return null; }).then(function (body) { if (!res.ok) { var err = new Error((body && body.message) || ('HTTP ' + res.status)); err.status = res.status; err.code = body && body.code; throw err; } return body; }); });
   }
@@ -98,6 +99,7 @@
   }
   // open an existing Family Code on this device
   function linkCode(raw, opts) {
+    if (!SUPA_URL) return Promise.resolve(false); /* cloud hard-off */
     opts = opts || {};
     var code = E.normalizeSyncCode(raw);
     if (!code) { toast('That code does not look right. It has 8 letters and numbers, like K7M9-P4X2.', 4000); return Promise.resolve(false); }
@@ -124,6 +126,7 @@
   function wsSend(msg) { try { if (cloud.ws && cloud.ws.readyState === 1) { cloud.ws.send(JSON.stringify(msg)); return true; } } catch (e) { /* ignore */ } return false; }
   function topic() { return 'realtime:arena:' + cloud.code; }
   function connectLive() {
+    if (!SUPA_URL) return;
     if (!cloud.code || typeof WebSocket === 'undefined') return;
     if (cloud.ws) { try { cloud.ws.onclose = null; cloud.ws.close(); } catch (e) { /* ignore */ } }
     cloud.live = false; updateSyncIndicator();
@@ -157,6 +160,7 @@
   }
   // While Parent View is open, also check every 10 seconds in case a live message was missed.
   function checkVersion() {
+    if (!SUPA_URL) return;
     if (!cloud.code || cloud.busy || document.hidden) return;
     rpc('arena_version', { p_sync_code: cloud.code }).then(function (v) {
       if (v && v.found && v.updatedAt !== cloud.serverAt) syncNow();
@@ -170,6 +174,7 @@
     if (!want && cloud.poll) { clearInterval(cloud.poll); cloud.poll = null; }
   }
   function initCloud() {
+    if (!SUPA_URL) return Promise.resolve(false); /* local-only build: cloud never starts, even with a ?code= link */
     var params = null; try { params = new URLSearchParams(location.search); } catch (e) { params = null; }
     var fromUrl = params && params.get('code');
     if (fromUrl !== null && fromUrl !== undefined) {
