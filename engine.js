@@ -996,7 +996,7 @@
   });
   var PLACEMENT = PLACEMENT_SETS.full;
 
-  function beltForPct(pct) { return pct < 0.25 ? 'White' : pct < 0.55 ? 'Yellow' : pct < 0.85 ? 'Orange' : 'Green'; }
+  function beltForPct(pct) { return pct < 0.25 ? 'Recruit' : pct < 0.55 ? 'Cadet' : pct < 0.85 ? 'Deputy' : 'Officer'; }
   function beltByName(name) { for (var i = 0; i < BELTS.length; i++) if (BELTS[i].name === name) return BELTS[i]; return BELTS[0]; }
 
   // results: [{pid, correct:bool, skipped:bool}]

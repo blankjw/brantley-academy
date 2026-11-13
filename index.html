@@ -4,11 +4,27 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dispatch Academy - Brantley</title>
+<meta name="description" content="Dispatch Academy: a Texas 5th-grade drill school with a police-records theme - math, reading, spelling, grammar, good citizenship, science, and social studies, plus a simple Parent View for Craig.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎖️</text></svg>">
 <link rel="stylesheet" href="base.css">
 <link rel="stylesheet" href="skin.css">
 </head>
 <body>
-<div id="app"></div>
+<header class="topbar no-print">
+  <button class="brand" data-nav="home" aria-label="Dispatch Academy home">Dispatch <span>Academy</span></button>
+  <nav class="nav" aria-label="Main">
+    <button data-nav="home">Home</button>
+    <button data-nav="placement">Field Test</button>
+    <button data-nav="practice">Practice</button>
+    <button data-nav="lab">Fraction Lab</button>
+  </nav>
+  <div class="hud" id="hud"></div>
+  <button class="dad-btn" data-nav="parent" id="dadBtn">👮 Parent View</button>
+</header>
+<main id="app" class="no-print" tabindex="-1"></main>
+<div id="printReport" class="print-only"></div>
+<div id="modal" class="modal hidden" role="dialog" aria-modal="true"></div>
+<div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <script src="bank.js"></script>
 <script src="engine.js"></script>
 <script src="app.js"></script>

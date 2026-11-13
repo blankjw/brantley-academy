@@ -15,7 +15,7 @@
   // ---------- cloud sync (Supabase) ----------
   // No logins. Each family gets a Family Code like K7M9-P4X2. Progress is saved on this device first (works offline),
   // then copied to the cloud. Any phone or computer that opens the Family Link sees the same progress, live.
-  var SUPA_URL = 'https://zrccpbvmpqordmywvjrx.supabase.co';
+  var SUPA_URL = null; /* cloud sync hard-disabled 2026-11-12: local-only build, no external backend */
   var SUPA_KEY = 'sb_publishable_Dwkc2RhkRM6aYrqm27GxDw_Ht-dYS6y'; // public "publishable" key: it can only call the 4 arena_* functions
   var SYNC_KEY = 'mathArena5.sync';
   var cloud = { code: null, status: 'idle', live: false, lastSyncedAt: null, serverAt: null, dirty: false, busy: false, again: false, timer: null, ws: null, wsRef: 0, hb: null, poll: null, retry: 0, error: '' };
@@ -55,6 +55,7 @@
   }
   // Pull the cloud copy, merge it with this device, push back anything new. Never drops progress from either side.
   function syncNow() {
+    if (!SUPA_URL) return Promise.resolve(true);
     if (!cloud.code) return Promise.resolve(false);
     if (cloud.busy) { cloud.again = true; return cloud.busyP; }
     if (typeof navigator !== 'undefined' && navigator.onLine === false) { setStatus('offline'); return Promise.resolve(false); }
@@ -351,8 +352,8 @@
     }).join('') + '</div>';
   }
   function beltProgress() {
-    var b = E.beltForXp(state.xp), nb = E.nextRank(state.xp);
-    if (!nb) return '<p>You reached <b>Black Rank</b>. Legend status.</p>';
+    var b = E.beltForXp(state.xp), nb = E.nextBelt(state.xp);
+    if (!nb) return '<p>You reached <b>Chief Rank</b>. Legend status.</p>';
     var pct = Math.round(100 * (state.xp - b.xp) / (nb.xp - b.xp));
     return '<p class="muted">' + (nb.xp - state.xp) + ' XP to <b>' + nb.name + ' Rank</b></p><div class="progress"><div style="width:' + pct + '%"></div></div>';
   }
@@ -378,7 +379,7 @@
     html += '<h2 style="margin-top:22px">Pick a Subject</h2><div class="grid cols-4" id="subjectCards">' + E.SUBJECTS.map(function (s) {
       return '<div class="card subject-card" data-action="subject" data-subject="' + s.id + '" role="button" tabindex="0" aria-label="Open ' + esc(s.label) + '"><div class="sicon">' + s.icon + '</div><h3>' + esc(s.label) + '</h3>' + statusBadge(st[s.id]) + '<p class="muted small">' + E.modulesFor(s.id).length + ' modules</p></div>';
     }).join('') + '<div class="card subject-card" data-nav="lab" role="button" tabindex="0" aria-label="Open Fraction Lab"><div class="sicon">🧪</div><h3>Fraction Lab</h3><span class="sbadge none">Play tool</span><p class="muted small">Click bars to build fractions</p></div></div>';
-    html += '<div class="family-row" id="familyRow"><span class="sync-status" data-sync-status></span><button class="linkbtn" data-action="link-open" id="haveCodeBtn">Already have a Family Code?</button></div>';
+    html += '<div class="family-row" id="familyRow"><span class="muted" style="font-size:14px">Progress saves on this device. Use Backup in Parent View for an extra copy.</span></div>';
     app.innerHTML = html;
   }
   function renderPractice() {
@@ -537,7 +538,7 @@
     }
     var usedHint = r.hintsShown > 0;
     var res = E.recordAnswerDetailed(state, q, chk.correct, usedHint), gained = res.xp;
-    r.xpGained += gained; r.hintsTotal += r.hintsShown; r.results.push(chk.correct); r.answered = true;
+    r.xpGained += gained; r.hintsTotal += r.hintsShown + (r.lcdShown ? 1 : 0); r.results.push(chk.correct); r.answered = true;
     if (q.answerType === 'choice') r.selected = String(given);
     if (q.answerType === 'number' || q.answerType === 'decimal' || q.answerType === 'text') r.draft.ans = String(given);
     if (!chk.correct) r.missed.push({ prompt: q.prompt, given: q.answerType === 'shade' ? given + ' parts shaded' : String(given), answer: E.answerText(q), note: q.note || '', subject: q.subject });
@@ -624,7 +625,7 @@
   // ----- parent view -----
   function pvState() { return preview ? E.sampleState() : state; }
   function renderPin() {
-    app.innerHTML = '<div class="pv"><h1>Dad / Parent View</h1><div class="pv-card"><p style="font-size:26px"><b>Enter the 4-digit PIN</b></p>' +
+    app.innerHTML = '<div class="pv"><h1>Parent View</h1><div class="pv-card"><p style="font-size:26px"><b>Enter the 4-digit PIN</b></p>' +
       '<input id="pinEntry" class="pin-input" type="password" inputmode="numeric" maxlength="4" autocomplete="off" aria-label="PIN">' +
       '<div><button class="pvbtn primary" data-action="pin-unlock">Open Parent View</button></div>' +
       '<p>If you never changed it, the PIN is <b>0000</b>.</p></div></div>';
@@ -696,21 +697,14 @@
         '<div class="pv-card" id="pinCard">' + (state.parent.pinEnabled
           ? '<p><b>PIN lock is ON.</b> The PIN is <b>' + (state.parent.pin === '0000' ? '0000' : 'the one you picked') + '</b>. This keeps him from resetting progress by accident.</p><label for="newPin">New 4-digit PIN:</label> <input type="tel" id="newPin" maxlength="4" inputmode="numeric"> <button class="pvbtn" data-action="pin-change">Save PIN</button><br><button class="pvbtn" data-action="pin-off">Turn PIN lock OFF</button>'
           : '<p><b>PIN lock is OFF.</b> Anyone can open this page. Turn it on so he cannot reset progress by accident. The starting PIN is <b>0000</b>.</p><button class="pvbtn" data-action="pin-on" id="pinOnBtn">Turn PIN lock ON</button>') + '</div>' +
-        '<div class="pv-card"><p><b>Backup file</b> (extra safety copy; the Family Code already keeps progress in the cloud):</p><button class="pvbtn" data-action="backup" id="backupBtn">Download backup file</button><label class="pvbtn" style="display:inline-block" id="restoreLabel">Restore from backup<input type="file" id="restoreFile" accept="application/json,.json" style="display:none"></label></div>' +
-        '<h2>Reset</h2><p>This erases all of his progress on every device that uses this Family Code. It cannot be undone.</p><button class="pvbtn danger" data-action="reset" id="resetBtn">Reset Progress</button>';
+        '<div class="pv-card"><p><b>Backup file</b> (extra safety copy):</p><button class="pvbtn" data-action="backup" id="backupBtn">Download backup file</button><label class="pvbtn" style="display:inline-block" id="restoreLabel">Restore from backup<input type="file" id="restoreFile" accept="application/json,.json" style="display:none"></label></div>' +
+        '<h2>Reset</h2><p>This erases all of his progress on this device. It cannot be undone.</p><button class="pvbtn danger" data-action="reset" id="resetBtn">Reset Progress</button>';
     }
     html += '<p style="margin-top:30px"><button class="pvbtn" data-nav="home">⬅ Back to the game</button></p></div>';
     app.innerHTML = html;
   }
   function familyCard() {
-    var code = cloud.code;
-    return '<h2>Family Code &amp; Cloud Sync</h2><div class="pv-card family-card" id="familyCard"><p class="sync-line"><span class="sync-status" data-sync-status></span></p>' +
-      (code ? '<p>Your Family Code:</p><div class="family-code" id="familyCode">' + esc(code) + '</div>' +
-        '<p>Open the Family Link on any phone, tablet, or computer to see the same progress. New answers show up here by themselves.</p>' +
-        '<button class="pvbtn primary" data-action="copy-link" id="copyLinkBtn">🔗 Copy Family Link</button><button class="pvbtn" data-action="copy-code" id="copyCodeBtn">Copy Code</button>'
-        : '<p>Setting up cloud save. If this takes a while, check the Wi-Fi. Progress is still saved on this device.</p>') +
-      '<button class="pvbtn" data-action="link-open" id="useOtherCode">Use a different Family Code</button>' +
-      '<p class="small-note">Keep the link in the family. Anyone who has it can see and add to his progress.</p></div>';
+    return '<h2>Saved Progress</h2><div class="pv-card family-card" id="familyCard"><p>Progress is saved on this device only - nothing leaves this browser. Use <b>Backup file</b> below to keep an extra copy or to move progress to another device.</p></div>';
   }
   function reviewSection(s) {
     var due = E.dueSkills(s), rows = E.SKILL_ORDER.filter(function (k) { var x = s.skill[k]; return x.history.length || x.srNextDue || x.level !== 1; });
@@ -847,7 +841,7 @@
         break;
       }
       case 'reset':
-        showModal('<h2>Erase all progress?</h2><p>This clears his rank, XP, placement results, practice log, and session history on every device that uses this Family Code. It cannot be undone.</p><div class="row"><button class="danger" data-action="reset-yes" id="resetYes">Yes, erase everything</button><button class="primary" data-action="modal-close">No, keep it</button></div>');
+        showModal('<h2>Erase all progress?</h2><p>This clears his rank, XP, placement results, practice log, and session history on this device. It cannot be undone.</p><div class="row"><button class="danger" data-action="reset-yes" id="resetYes">Yes, erase everything</button><button class="primary" data-action="modal-close">No, keep it</button></div>');
         break;
       case 'reset-yes': {
         var keepParent = state.parent, keepName = state.studentName;
@@ -881,6 +875,7 @@
     }
   });
   document.addEventListener('keydown', function (e) {
+    if (e.key === ' ' && e.target && e.target.classList && (e.target.classList.contains('module') || e.target.classList.contains('subject-card'))) { e.preventDefault(); e.target.click(); return; }
     if (e.key !== 'Enter') return;
     var t = e.target;
     if (t.id === 'pinEntry') { e.preventDefault(); document.querySelector('[data-action="pin-unlock"]').click(); return; }

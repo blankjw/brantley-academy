@@ -30,22 +30,30 @@
   // modal
   var modal = document.createElement('div');
   modal.id = 'ba-modal';
-  modal.innerHTML = '<div class="sheet"><button class="close-x" id="ba-close">&times;</button><div id="ba-sheet-body"></div></div>';
+  modal.innerHTML = '<div class="sheet" role="document"><button class="close-x" id="ba-close" aria-label="Close">&times;</button><div id="ba-sheet-body"></div></div>';
+  modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-modal', 'true'); modal.setAttribute('aria-label', 'Dispatch Academy extras');
   document.body.appendChild(modal);
-  function open(html) { document.getElementById('ba-sheet-body').innerHTML = html; modal.classList.add('open'); }
-  function close() { modal.classList.remove('open'); }
+  var lastFocus = null;
+  function open(html) { lastFocus = document.activeElement; document.getElementById('ba-sheet-body').innerHTML = html; modal.classList.add('open'); }
+  function close() { modal.classList.remove('open'); if (lastFocus && lastFocus.focus) lastFocus.focus(); }
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && modal.classList.contains('open')) close(); });
   modal.addEventListener('click', function (e) { if (e.target === modal) close(); });
 
   document.getElementById('ba-memo-btn').addEventListener('click', function () {
     var p = PROMPTS[Math.floor(Math.random() * PROMPTS.length)];
     open('<h2>&#128680; Incident Report</h2><p>' + esc(p) +
-      '</p><textarea id="ba-memo-text" placeholder="Type your report here..."></textarea>' +
+      '</p><label for="ba-memo-text" style="display:block;margin:6px 0 2px">Your report</label><textarea id="ba-memo-text" placeholder="Type your report here..."></textarea>' +
       '<p id="ba-count" style="color:var(--muted)">0 words typed</p>' +
       '<button class="btn" id="ba-memo-save">File the Report</button>');
     var ta = document.getElementById('ba-memo-text');
+    var draftKey = MEMO_KEY + '.draft';
+    try { ta.value = localStorage.getItem(draftKey) || ''; } catch (e) {}
     ta.focus();
+    function updCount() { document.getElementById('ba-count').textContent = words(ta.value) + ' words typed'; }
+    updCount();
     ta.addEventListener('input', function () {
-      document.getElementById('ba-count').textContent = words(ta.value) + ' words typed';
+      updCount();
+      try { localStorage.setItem(draftKey, ta.value); } catch (e) {}
     });
     document.getElementById('ba-memo-save').addEventListener('click', function () {
       var text = ta.value.trim();
@@ -53,6 +61,7 @@
       var m = memos();
       m.push({ date: new Date().toISOString(), prompt: p, text: text, words: words(text) });
       saveMemos(m);
+      try { localStorage.removeItem(draftKey); } catch (e) {}
       open('<h2>&#9989; Report Filed</h2><p>Nice work, officer. <b>' + words(text) + ' words</b> on file. ' +
         'Ask a grown-up to hit <b>Send Report to Craig</b> to send it along.</p><button class="btn" id="ba-done">Done</button>');
       document.getElementById('ba-done').addEventListener('click', close);
@@ -73,7 +82,7 @@
     // if the kid has not started yet, point Craig at the login instead of an empty report
     var started = (state.xp || 0) > 0 || (state.checks && Object.keys(state.checks).length > 0) || m.length > 0;
     if (!started) {
-      body = 'He has not started his first shift yet. Send him the login and have him take the Field Test: this site link + the code he writes on his login card.\n\nNo progress logged yet as of ' + new Date().toLocaleDateString();
+      body = 'He has not started his first shift yet. Point him back at this site and have him take the Field Test when he is ready.\n\nNo progress logged yet as of ' + new Date().toLocaleDateString();
       href = 'mailto:' + DADS.join(',') + '?subject=' + subject + '&body=' + encodeURIComponent(body);
     }
     window.location.href = href;
