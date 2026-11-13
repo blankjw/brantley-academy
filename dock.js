@@ -1,4 +1,4 @@
-/* Dispatch Academy extras: incident-report writer + one-tap email to Dad.
+/* Dispatch Academy extras: incident-report writer + one-tap email to Craig.
    Floats on top of the arena app; does not touch its internals. */
 (function () {
   'use strict';
@@ -24,7 +24,7 @@
   // dock
   var dock = document.createElement('div');
   dock.id = 'ba-dock';
-  dock.innerHTML = '<button id="ba-memo-btn">&#128221; Write a Report</button><button id="ba-mail-btn">&#9993; Email Report to Dad</button>';
+  dock.innerHTML = '<button id="ba-memo-btn">&#128221; Write a Report</button><button id="ba-mail-btn">&#9993; Send Report to Craig</button>';
   document.body.appendChild(dock);
 
   // modal
@@ -54,7 +54,7 @@
       m.push({ date: new Date().toISOString(), prompt: p, text: text, words: words(text) });
       saveMemos(m);
       open('<h2>&#9989; Report Filed</h2><p>Nice work, officer. <b>' + words(text) + ' words</b> on file. ' +
-        'Ask a grown-up to hit <b>Email Report to Dad</b> to send it along.</p><button class="btn" id="ba-done">Done</button>');
+        'Ask a grown-up to hit <b>Send Report to Craig</b> to send it along.</p><button class="btn" id="ba-done">Done</button>');
       document.getElementById('ba-done').addEventListener('click', close);
     });
   });
@@ -70,7 +70,7 @@
     }
     var subject = encodeURIComponent('Dispatch Academy report');
     var href = 'mailto:' + DADS.join(',') + '?subject=' + subject + '&body=' + encodeURIComponent(body);
-    // if the kid has not started yet, point Dad at the login instead of an empty report
+    // if the kid has not started yet, point Craig at the login instead of an empty report
     var started = (state.xp || 0) > 0 || (state.checks && Object.keys(state.checks).length > 0) || m.length > 0;
     if (!started) {
       body = 'He has not started his first shift yet. Send him the login and have him take the Field Test: this site link + the code he writes on his login card.\n\nNo progress logged yet as of ' + new Date().toLocaleDateString();
