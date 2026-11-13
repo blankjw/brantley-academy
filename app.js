@@ -30,6 +30,7 @@
   function newCode() { return E.makeSyncCode(function (n) { var b = new Uint8Array(n); window.crypto.getRandomValues(b); return b; }); }
   function setStatus(s, err) { cloud.status = s; cloud.error = err || ''; updateSyncIndicator(); }
   function syncText() {
+    if (!SUPA_URL) return { cls: 'ok', text: '📍 Saved on this device' };
     if (!cloud.code) return { cls: 'off', text: '☁️ Setting up cloud save...' };
     if (cloud.status === 'offline') return { cls: 'warn', text: '📴 Offline: saved on this device. It will sync when Wi-Fi is back.' };
     if (cloud.status === 'error') return { cls: 'warn', text: '⚠️ Could not reach the cloud. Saved on this device, will try again.' };
@@ -152,6 +153,7 @@
     ws.onerror = function () { /* onclose handles reconnects */ };
   }
   function broadcast() {
+    if (!SUPA_URL) return;
     cloud.wsRef += 1;
     var msg = { topic: topic(), event: 'broadcast', payload: { type: 'broadcast', event: 'updated', payload: { at: Date.now() } }, ref: String(cloud.wsRef), join_ref: cloud.joinRef };
     if (cloud.live && wsSend(msg)) return;
@@ -450,7 +452,7 @@
     }).join('');
     var others = E.PLACEMENT_KINDS.filter(function (k) { return k !== c.kind && !(state.checks && state.checks[k]); });
     app.innerHTML = '<div class="card qcard" id="placementResults"><div class="hero"><div class="belt-big" style="background:' + b.color + ';color:' + b.text + '"><span class="knot">🎖️</span>' + b.name + '</div><div><h1>Report Card: ' + b.name + ' Rank start!</h1><p>' + esc(info.label) + ': you got <b>' + c.score + ' out of ' + c.total + '</b>. ' + msg + '</p></div></div>' +
-      '<h2 style="margin-top:14px">All-Subject Report Card</h2><p class="muted small"><b>Solid</b> = got it. <b>Working On It</b> = getting there. <b>Needs Focus First</b> = start here.</p>' +
+      '<h2 style="margin-top:14px">All-Subject Report Card</h2><p class="muted small"><b>Solid</b> = strong start on these. <b>Working On It</b> = warming up. <b>Needs Focus First</b> = begin here. This is a first-day snapshot from a few quick checks, not a final grade.</p>' +
       '<div class="result-areas" id="reportCard">' + rows + '</div>' +
       '<div class="card mission-card" style="margin:14px 0"><h2>🗓️ Today\'s Balanced Daily Mission is set</h2><p class="muted">It starts with your weakest subjects first.</p><div class="row"><button class="btn purple" data-action="mission" data-count="5" id="resultsMission5">Start Quick 5</button><button class="btn ghost" data-action="mission" data-count="7" id="resultsMission7">Start Full 7</button></div></div>' +
       '<div class="card module recommended" data-action="start" data-module="' + m.id + '" role="button"><span class="badge">Your starting module</span><h2 style="margin-top:8px">' + m.icon + ' ' + esc(subj(m.subject).label) + ': ' + esc(m.title) + '</h2><p class="muted">' + esc(m.blurb) + '</p></div>' +
@@ -709,7 +711,7 @@
     app.innerHTML = html;
   }
   function familyCard() {
-    return '<h2>Saved Progress</h2><div class="pv-card family-card" id="familyCard"><p>Progress is saved on this device only - nothing leaves this browser. Use <b>Backup file</b> below to keep an extra copy or to move progress to another device.</p></div>';
+    return '<h2>Saved Progress</h2><div class="pv-card family-card" id="familyCard"><p>Progress is saved on this device only. Nothing is uploaded anywhere while cloud save is off. The only thing that ever leaves is what you deliberately send: the <b>Send Report to Craig</b> button opens an email draft that you approve before it goes. Use <b>Backup file</b> below for an extra copy - it includes every incident report he has written - or to move progress to another device.</p></div>';
   }
   function reviewSection(s) {
     var due = E.dueSkills(s), rows = E.SKILL_ORDER.filter(function (k) { var x = s.skill[k]; return x.history.length || x.srNextDue || x.level !== 1; });
@@ -730,7 +732,9 @@
       '<div class="row"><button class="primary" data-action="link-go" id="linkGo">Link this code</button><button data-action="modal-close">Cancel</button></div>');
     var el = document.getElementById('codeInput'); if (el) el.focus();
   }
-  function showModal(html) { var m = document.getElementById('modal'); m.innerHTML = '<div class="box">' + html + '</div>'; m.classList.remove('hidden'); }
+  var modalPrevFocus = null;
+  function showModal(html) { var m = document.getElementById('modal'); m.innerHTML = '<div class="box">' + html + '</div>'; m.classList.remove('hidden'); modalPrevFocus = document.activeElement; var f = m.querySelector('button, [href], input, textarea, [tabindex]:not([tabindex="-1"])'); if (f) setTimeout(function () { try { f.focus(); } catch (e) {} }, 0); }
+  document.addEventListener('keydown', function (e) { if (e.key !== 'Escape') return; var m = document.getElementById('modal'); if (m && !m.classList.contains('hidden')) { m.classList.add('hidden'); if (modalPrevFocus && document.contains(modalPrevFocus) && modalPrevFocus.focus) modalPrevFocus.focus(); } });
   function hideModal() { var m = document.getElementById('modal'); m.classList.add('hidden'); m.innerHTML = ''; }
   function summaryText() { return E.buildSummaryText(pvState()); }
   function copyText(text, okMsg) {
@@ -830,7 +834,13 @@
       case 'print': document.getElementById('printReport').textContent = summaryText(); window.print(); break;
       case 'copy': copyText(summaryText()); break;
       case 'download': download('5th-grade-arena-summary-' + E.todayKey() + '.txt', summaryText()); toast('Summary downloaded.'); break;
-      case 'backup': download('5th-grade-arena-backup-' + E.todayKey() + '.json', JSON.stringify(state, null, 2), 'application/json'); toast('Backup downloaded.'); break;
+      case 'backup': {
+        var out = JSON.parse(JSON.stringify(state));
+        try { out.written = JSON.parse(localStorage.getItem('ba.memos') || '[]'); } catch (e2) { out.written = []; }
+        try { out.writtenDraft = localStorage.getItem('ba.memos.draft') || null; } catch (e2) {}
+        download('dispatch-academy-backup-' + E.todayKey() + '.json', JSON.stringify(out, null, 2), 'application/json');
+        toast('Backup downloaded - includes written reports.');
+      } break;
       case 'save-name': state.studentName = (document.getElementById('nameInput').value || '').trim().slice(0, 20); touchSettings(); save(); toast('Name saved.'); render(); break;
       case 'pin-on': state.parent.pinEnabled = true; state.parent.pin = state.parent.pin || '0000'; parentUnlocked = true; touchSettings(); save(); toast('PIN lock is on. PIN: ' + state.parent.pin, 3000); renderParent(); break;
       case 'pin-off': state.parent.pinEnabled = false; touchSettings(); save(); toast('PIN lock is off.'); renderParent(); break;
@@ -873,7 +883,7 @@
     if (t.id === 'restoreFile' && t.files && t.files[0]) {
       var fr = new FileReader();
       fr.onload = function () {
-        try { var parsed = JSON.parse(fr.result); if (!parsed || typeof parsed.xp !== 'number') throw new Error('bad'); state = E.loadState(parsed); state.resetAt = new Date().toISOString(); touchSettings(); save(); toast('Backup restored.'); renderHud(); renderParent(); }
+        try { var parsed = JSON.parse(fr.result); if (!parsed || typeof parsed.xp !== 'number') throw new Error('bad'); state = E.loadState(parsed); if (Array.isArray(parsed.written)) { try { localStorage.setItem('ba.memos', JSON.stringify(parsed.written)); } catch (e2) {} } if (typeof parsed.writtenDraft === 'string') { try { localStorage.setItem('ba.memos.draft', parsed.writtenDraft); } catch (e2) {} } state.resetAt = new Date().toISOString(); touchSettings(); save(); toast('Backup restored.'); renderHud(); renderParent(); }
         catch (err) { toast('That file did not look like a Dispatch Academy backup.'); }
       };
       fr.readAsText(t.files[0]);
